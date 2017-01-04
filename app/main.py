@@ -43,22 +43,37 @@ async def get_response(keyword, url):
 
 
 def parse_response2weekly(res):
+    '''
+    レスポンス(json)から週毎の記事の数のリストへ変換
+    '''
+    # TODO
+    # numFoundが100を超えていた場合の処理
     docs = res['response']['result']['doc']
     for doc in docs:
         release_date = doc['ReleaseDate']
 
 
 def convert_str2date(date_str):
+    '''
+    date_str(string型，'2016-01-01')からdate型へ変換
+    '''
     return datetime.date(*[int(a) for a in date_str.split('-')])
 
 
 def init_week_num_dict(start_date, end_date):
+    '''
+    (年, 週番号)をkeyとするdictionaryを生成
+    valueはすべて0
+    '''
     start_week_num_tpl = start_date.isocalendar()[:-1]
     end_week_num_tpl = end_date.isocalendar()[:-1]
 
     week_num_dict = {}
     key_year = start_week_num_tpl[0]
     key_week_num = start_week_num_tpl[1]
+
+    # 週番号を1ずつ増やしてkeyとして，valueを0に初期化する処理
+    # 週番号が52になったとき，次の年の1週目に行くか，53週目があるのかを判定
     while((key_year, key_week_num) != end_week_num_tpl):
         week_num_dict[(key_year, key_week_num)] = 0
         if key_week_num == 53 or \
@@ -70,6 +85,7 @@ def init_week_num_dict(start_date, end_date):
         key_week_num += 1
     week_num_dict[end_week_num_tpl] = 0
     return week_num_dict
+
 
 def main(argv):
     print(parse_args(argv))
