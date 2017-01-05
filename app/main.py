@@ -32,7 +32,7 @@ def generate_url(keyword, start_date, end_date):
     return end_point + urllib.parse.urlencode(params)
 
 
-async def get_response(keyword, url):
+async def get_response(url):
     '''
     keywordとそれに対応するAPIのURLを叩いて結果をJSONにして返す
     '''
@@ -42,7 +42,7 @@ async def get_response(keyword, url):
     return json_data
 
 
-def parse_response2weekly(res, start_date, end_date):
+def parse_response2week_num_list(res, start_date, end_date):
     '''
     レスポンス(json)から週毎の記事の数のリストへ変換
     '''
@@ -54,6 +54,11 @@ def parse_response2weekly(res, start_date, end_date):
         release_date = doc['ReleaseDate']
         week_num_dict[convert_str2date(release_date).isocalendar()[:-1]] += 1
     return week_num_dict
+
+
+async def url2week_num_dict(url, start_date, end_date):
+    res = await get_response(url)
+    return parse_response2week_num_list(res, start_date, end_date)
 
 
 def convert_str2date(date_str):
@@ -96,12 +101,11 @@ def main(argv):
 
     for keyword in args['keywords']:
         url = generate_url(keyword, args['start_date'], args['end_date'])
-        urls.append({'url': url, 'keyword': keyword})
+        urls.append(url)
 
-    futures = [get_response(url['keyword'], url['url']) for url in urls]
+    futures = [url2week_num_dict(url, args['start_date'], args['end_date']) for url in urls]
     loop = asyncio.get_event_loop()
     tasks = loop.run_until_complete(asyncio.wait(futures))[0]
-    print(tasks)
 
     for task in tasks:
-        print(parse_response2weekly(task.result(), args['start_date'], args['end_date']))
+        print(task.result())
