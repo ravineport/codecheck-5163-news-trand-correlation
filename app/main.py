@@ -42,15 +42,18 @@ async def get_response(keyword, url):
     return json_data
 
 
-def parse_response2weekly(res):
+def parse_response2weekly(res, start_date, end_date):
     '''
     レスポンス(json)から週毎の記事の数のリストへ変換
     '''
     # TODO
     # numFoundが100を超えていた場合の処理
     docs = res['response']['result']['doc']
+    week_num_dict = init_week_num_dict(convert_str2date(start_date), convert_str2date(end_date))
     for doc in docs:
         release_date = doc['ReleaseDate']
+        week_num_dict[convert_str2date(release_date).isocalendar()[:-1]] += 1
+    return week_num_dict
 
 
 def convert_str2date(date_str):
@@ -88,4 +91,17 @@ def init_week_num_dict(start_date, end_date):
 
 
 def main(argv):
-    print(parse_args(argv))
+    args = parse_args(argv)
+    urls = []
+
+    for keyword in args['keywords']:
+        url = generate_url(keyword, args['start_date'], args['end_date'])
+        urls.append({'url': url, 'keyword': keyword})
+
+    futures = [get_response(url['keyword'], url['url']) for url in urls]
+    loop = asyncio.get_event_loop()
+    tasks = loop.run_until_complete(asyncio.wait(futures))[0]
+    print(tasks)
+
+    for task in tasks:
+        print(parse_response2weekly(task.result(), args['start_date'], args['end_date']))
