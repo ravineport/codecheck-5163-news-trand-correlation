@@ -53,7 +53,7 @@ def parse_response2week_num_list(res, start_date, end_date):
     for doc in docs:
         release_date = doc['ReleaseDate']
         week_num_dict[convert_str2date(release_date).isocalendar()[:-1]] += 1
-    return week_num_dict
+    return week_num_dict2lst(week_num_dict)
 
 
 async def url2week_num_dict(url, start_date, end_date):
@@ -66,6 +66,11 @@ def convert_str2date(date_str):
     date_str(string型，'2016-01-01')からdate型へ変換
     '''
     return datetime.date(*[int(a) for a in date_str.split('-')])
+
+
+def week_num_dict2lst(week_num_dict):
+    sored_dict = sorted(week_num_dict.items(), key=lambda x: x[0])
+    return [d[1] for d in sored_dict]
 
 
 def init_week_num_dict(start_date, end_date):
