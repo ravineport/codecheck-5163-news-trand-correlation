@@ -105,20 +105,12 @@ def init_week_num_dict(start_date, end_date):
 def pearson_correlation_coefficient(lst1, lst2):
     x = np.array(lst1)
     y = np.array(lst2)
-    print(x)
-    print(y)
     x_mean = np.mean(x)
     y_mean = np.mean(y)
-    print(x_mean)
-    print(y_mean)
     xx = x - x_mean
     yy = y - y_mean
-    print(xx)
-    print(yy)
     numerator = np.sum(xx * yy)
     denominator = np.sqrt(np.sum(xx ** 2) * np.sum(yy ** 2))
-    print(numerator)
-    print(denominator)
     return numerator / denominator
 
 
@@ -134,10 +126,7 @@ def main(argv):
     loop = asyncio.get_event_loop()
     tasks = loop.run_until_complete(asyncio.wait(futures))[0]
 
-    results = []
-    for task in tasks:
-        print(task.result())
-        results.append(task.result())
+    results = [task.result() for task in tasks]
 
     print(pearson_correlation_coefficient(results[0], results[1]))
 
