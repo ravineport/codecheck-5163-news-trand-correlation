@@ -5,6 +5,7 @@ import json
 import asyncio
 import aiohttp
 import datetime
+import numpy as np
 
 
 end_point = "http://54.92.123.84/search?"
@@ -49,6 +50,7 @@ def parse_response2week_num_list(res, start_date, end_date):
     # TODO
     # numFoundが100を超えていた場合の処理
     docs = res['response']['result']['doc']
+    print(res['response']['result']['numFound'])
     week_num_dict = init_week_num_dict(convert_str2date(start_date), convert_str2date(end_date))
     for doc in docs:
         release_date = doc['ReleaseDate']
@@ -100,6 +102,26 @@ def init_week_num_dict(start_date, end_date):
     return week_num_dict
 
 
+def pearson_correlation_coefficient(lst1, lst2):
+    x = np.array(lst1)
+    y = np.array(lst2)
+    print(x)
+    print(y)
+    x_mean = np.mean(x)
+    y_mean = np.mean(y)
+    print(x_mean)
+    print(y_mean)
+    xx = x - x_mean
+    yy = y - y_mean
+    print(xx)
+    print(yy)
+    numerator = np.sum(xx * yy)
+    denominator = np.sqrt(np.sum(xx ** 2) * np.sum(yy ** 2))
+    print(numerator)
+    print(denominator)
+    return numerator / denominator
+
+
 def main(argv):
     args = parse_args(argv)
     urls = []
@@ -112,5 +134,13 @@ def main(argv):
     loop = asyncio.get_event_loop()
     tasks = loop.run_until_complete(asyncio.wait(futures))[0]
 
+    results = []
     for task in tasks:
         print(task.result())
+        results.append(task.result())
+
+    print(pearson_correlation_coefficient(results[0], results[1]))
+
+
+    # print(pearson_correlation_coefficient([2.8, 3.4, 3.6, 5.8, 7.0, 9.5, 10.2, 12.3, 13.2, 13.4],
+    #                                       [0.6, 3.0, 0.4, 1.5, 15.0, 13.4, 7.6, 19.8, 18.3, 18.9]))
