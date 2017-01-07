@@ -6,6 +6,7 @@ import asyncio
 import aiohttp
 import datetime
 import numpy as np
+import math
 
 
 end_point = "http://54.92.123.84/search?"
@@ -51,55 +52,42 @@ def parse_response2week_num_list(res, start_date, end_date):
     # numFoundが100を超えていた場合の処理
     docs = res['response']['result']['doc']
     print(res['response']['result']['numFound'])
-    week_num_dict = init_week_num_dict(convert_str2date(start_date), convert_str2date(end_date))
+    week_num_lst = init_week_num_lst(start_date, end_date)
     for doc in docs:
-        release_date = doc['ReleaseDate']
-        week_num_dict[convert_str2date(release_date).isocalendar()[:-1]] += 1
-    return week_num_dict2lst(week_num_dict)
+        release_date = str2date(doc['ReleaseDate'])
+        idx = date2week_num_index(start_date, release_date)
+        print(str(release_date) + ' ' + str(idx))
+        week_num_lst[idx] += 1
+    return week_num_lst
 
 
-async def url2week_num_dict(url, start_date, end_date):
+async def url2week_num_dict(url, start_date_str, end_date_str):
     res = await get_response(url)
+    start_date = str2date(start_date_str)
+    end_date = str2date(end_date_str)
     return parse_response2week_num_list(res, start_date, end_date)
 
 
-def convert_str2date(date_str):
+def str2date(date_str):
     '''
     date_str(string型，'2016-01-01')からdate型へ変換
     '''
     return datetime.date(*[int(a) for a in date_str.split('-')])
 
 
-def week_num_dict2lst(week_num_dict):
-    sored_dict = sorted(week_num_dict.items(), key=lambda x: x[0])
-    return [d[1] for d in sored_dict]
-
-
-def init_week_num_dict(start_date, end_date):
+def init_week_num_lst(start_date, end_date):
     '''
-    (年, 週番号)をkeyとするdictionaryを生成
-    valueはすべて0
+    start_date ~ end_dateまでの週数個の要素を持つ0で初期化されたリスト(端数の日数も含む)
     '''
-    start_week_num_tpl = start_date.isocalendar()[:-1]
-    end_week_num_tpl = end_date.isocalendar()[:-1]
+    lst_size = math.ceil((end_date - start_date).days / 7)
+    return [0] * lst_size
 
-    week_num_dict = {}
-    key_year = start_week_num_tpl[0]
-    key_week_num = start_week_num_tpl[1]
 
-    # 週番号を1ずつ増やしてkeyとして，valueを0に初期化する処理
-    # 週番号が52になったとき，次の年の1週目に行くか，53週目があるのかを判定
-    while((key_year, key_week_num) != end_week_num_tpl):
-        week_num_dict[(key_year, key_week_num)] = 0
-        if key_week_num == 53 or \
-            (key_week_num == 52 and datetime.date(key_year, 12, 31).isocalendar()[1] != 53):
-            key_year += 1
-            key_week_num = 1
-            continue
-
-        key_week_num += 1
-    week_num_dict[end_week_num_tpl] = 0
-    return week_num_dict
+def date2week_num_index(start_date, date):
+    '''
+    dateを何週目かを表すインデックスに変換
+    '''
+    return math.floor((date - start_date).days / 7)
 
 
 def pearson_correlation_coefficient(lst1, lst2):
@@ -126,7 +114,9 @@ def main(argv):
     loop = asyncio.get_event_loop()
     tasks = loop.run_until_complete(asyncio.wait(futures))[0]
 
-    results = [task.result() for task in tasks]
+    results = [task.result()[:-1] for task in tasks]
+    for i in results:
+        print(i)
 
     print(pearson_correlation_coefficient(results[0], results[1]))
 
