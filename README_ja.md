@@ -1,6 +1,6 @@
 # ニューストレンドの相関性
 
-*これは[codecheck](http://app.code-check.io/openchallenges)のチャレンジだよ。 始めてみるには[ドキュを見てね](https://code-check.github.io/docs/ja)*
+*これは[codecheck](http://app.code-check.io/openchallenges)のチャレンジです。 初めての人はまず[ドキュメンテーション](https://code-check.github.io/docs/ja)を見てね。*
 
 相関係数とは2つ、もしくはそれ以上のデータ群の関連性を測る指標です。例えば，片方が大きいと，もう片方も大きくなる場合、その2つのデータ群には相関があるといいます。相関係数は無次元量で、−1以上1以下の実数に値をとります。相関係数が正のとき確率変数には正の相関が、負のとき確率変数には負の相関があるといいます。
 
@@ -11,7 +11,7 @@
 
 
 ## ザ・ミッション
-朝日新聞アーカイブ記事APIを利用し、入力した文字列の週刊単位での相関係数（ピアソンの積率相関係数）を出力する関数を実装せよ。
+朝日新聞アーカイブ記事APIを利用し、入力した文字列の週間単位での相関係数（ピアソンの積率相関係数）を出力する関数を実装せよ。
 また、任意の形態素解析APIを利用し、入力した文字列の品詞が全て等しいことを確認する機能を追加せよ。
 
 ## 実装方法
@@ -21,16 +21,19 @@
 CLIの実装方法については[指定言語].mdを参照ください。
 使用可能な言語は
 
-- nodejs
-- ruby
-- java
-- go
-- python
+- NodeJS
+- Ruby
+- Java
+- Go
+- Python2
+- Python3
 
 のいずれかです。
 
 ##### 入力形式
-`stdin`の入力値の形式は以下の通りです:
+キーワードと対象となる期間の範囲が入力として与えられます。
+キーワードは２つ以上与えられます。
+
 ```
 ["keyword1", "keyword2", ...]  startDate  endDate
 ```
@@ -39,42 +42,48 @@ CLIの実装方法については[指定言語].mdを参照ください。
 ["うどん", "香川県"]  2010-01-01  2016-01-01
 ```
 
-すなわち、複数キーワードの動的な長さの配列および掲載日の期間が入力として与えられます。
-
 ##### 出力形式
-期待する出力は以下の形式の単一の文字列です：
+期待する出力は以下のJSON形式の出力です:
 ```
 {
-  coefficients: [ [coefficientOfKeyword1vsKeyword1, coefficientOfKeyword1vsKeyword2],
+  "coefficients": [ [coefficientOfKeyword1vsKeyword1, coefficientOfKeyword1vsKeyword2],
                   [coefficientOfKeyword2vsKeyword1, coefficientOfKeyword2vsKeyword2] ],
-  posChecker: false
+  "posChecker": false
 }
 ```
 
 例えば:
 ```
-{ coefficients: [[1,0.275],[0.275,1]], posChecker: true }
+{ "coefficients": [[1,0.275],[0.275,1]], "posChecker": true }
 ```
 
 キーワードが３つであればこのような構造になります：
 ```
 {
-  coefficients: [
+  "coefficients": [
     [ 1, 0.208, 0.080 ],
     [ 0.208, 1, 0.201 ],
     [ 0.080, 0.201, 1 ]
   ],
-  posChecker: true
+  "posChecker": true
 }
 ```
 
+なお、インデントの有無は問いません。
+
 ##### 相関係数
 
-あなたの関数はまず、APIのレスポンス内の`response.result.numfound`、もしくは`response.result.doc`にある各記事の`Body`を直にクロールして取得した検索件数を、各キーワードごとに週別に分けた配列にします。次に、この複数の配列のピアソンの積率相関係数を計算します。
+あなたの関数はまず、キーワードごとに本文内にキーワードが存在する記事の総数を週ごとに小計し、配列にします。
+次に、この複数の配列のピアソンの積率相関係数を計算します。
 
+- 本文内にキーワードが存在する記事の総数を取得するには、以下の２つの方法があります：
+ - APIのレスポンス内の`response.result.numfound`を利用する。
+ - 直接APIのレスポンス内の`response.result.doc`にある各記事の`Body`をクロールしてキーワードを検出する。
+- 「週」とは、開始日から7日ごとに区切った期間とします。
+- 最後に「週」として割り切れない、端数の日数が残る場合は、その残りの日数分は小計せず、また配列に加えないものとします。
 - 出力の`coefficients`部分は各文字列同士の相関係数を配列の配列として表したものとなります。
 - 配列の長さはキーワード数と等しくなります。
-- 相関係数自体は小数点以下３桁に四捨五入してください。
+- 相関係数自体は小数点以下３桁に四捨五入します。
 
 ##### 形態素解析
 
