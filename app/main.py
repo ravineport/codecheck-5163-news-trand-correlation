@@ -8,15 +8,14 @@ import datetime
 import numpy as np
 import math
 import itertools
+import os
 
-end_point = "http://54.92.123.84/search?"
-api_key = "869388c0968ae503614699f99e09d960f9ad3e12"
-params = {
-    "q": "",
-    "wt": "json",
-    "rows": "100",
-    "ackey": api_key
-}
+
+asahi_end_point = 'http://54.92.123.84/search?'
+asahi_api_key = '869388c0968ae503614699f99e09d960f9ad3e12'
+
+goo_morph_end_point = 'https://labs.goo.ne.jp/api/morph'
+goo_morph_api_key = os.environ['GOO_MORPH_API_KEY']
 
 
 def parse_args(argv):
@@ -26,22 +25,50 @@ def parse_args(argv):
     return {'keywords': keywords, 'start_date': start_date, 'end_date': end_date}
 
 
-def generate_url(keyword, start_date, end_date):
+def generate_asahi_url(keyword, start_date, end_date):
     '''
     keywordを含む記事を日付の範囲を指定して検索するAPIを生成
     '''
-    params["q"] = "Body:" + keyword + " AND ReleaseDate:[" + start_date + " TO " + end_date + "]"
-    return end_point + urllib.parse.urlencode(params)
+    asahi_params = {
+        'q': "Body:" + keyword + " AND ReleaseDate:[" + start_date + " TO " + end_date + "]",
+        'wt': 'json',
+        'rows': '100',
+        'ackey': asahi_api_key
+    }
+    return asahi_end_point + urllib.parse.urlencode(asahi_params)
 
 
-async def get_response(url):
+async def get_response_by_get(url):
     '''
-    keywordとそれに対応するAPIのURLを叩いて結果をJSONにして返す
+    URLをGETで叩いて結果をJSONにして返す（非同期）
     '''
-    response = await aiohttp.get(url)
-    data = await response.text()
-    json_data = json.loads(data)
-    return json_data
+    async with aiohttp.get(url) as response:
+        data = await response.text()
+        json_data = json.loads(data)
+        return json_data
+
+
+async def get_response_of_goo_morph(keyword):
+    '''
+    gooの形態素解析APIをPOSTで叩いて結果をJSONにして返す（非同期）
+    '''
+    goo_morph_data = {
+        'app_id': goo_morph_api_key,
+        'sentence': keyword,
+        'info_filter': 'pos'
+    }
+    async with aiohttp.post(goo_morph_end_point, data=goo_morph_data) as response:
+        data = await response.text()
+        json_data = json.loads(data)
+        print(json_data)
+        return json_data
+
+
+async def url2week_num_dict(keyword, url, start_date_str, end_date_str):
+    res = await get_response_by_get(url)
+    start_date = str2date(start_date_str)
+    end_date = str2date(end_date_str)
+    return {'keyword': keyword, 'doc_num_per_week': parse_response2week_num_list(res, start_date, end_date)}
 
 
 def parse_response2week_num_list(res, start_date, end_date):
@@ -63,11 +90,9 @@ def parse_response2week_num_list(res, start_date, end_date):
     return week_num_lst
 
 
-async def url2week_num_dict(keyword, url, start_date_str, end_date_str):
-    res = await get_response(url)
-    start_date = str2date(start_date_str)
-    end_date = str2date(end_date_str)
-    return {'keyword': keyword, 'doc_num_per_week': parse_response2week_num_list(res, start_date, end_date)}
+def parse_goo_response(res):
+    word_list = res['word_list']
+
 
 
 def str2date(date_str):
@@ -106,10 +131,10 @@ def pearson_correlation_coefficient(lst1, lst2):
     return numerator / denominator
 
 
-def calc_all_combinations(keywords, results):
+def calc_all_combinations(keywords, asahi_results):
     combinations = []
     for comb in itertools.combinations(keywords, 2):
-        week_num_lsts = list(map(lambda x: x['doc_num_per_week'], filter(lambda r: r['keyword'] in comb, results)))
+        week_num_lsts = list(map(lambda x: x['doc_num_per_week'], filter(lambda r: r['keyword'] in comb, asahi_results)))
         pcc = pearson_correlation_coefficient(*week_num_lsts)
         if pcc != None:
             pcc = float(str(round(pcc, 3)))
@@ -130,7 +155,7 @@ def print_result(keywords, cc_result):
             cc_mat[j][i] = cc_mat[i][j]
 
     # print(json.dumps({"coefficients": cc_mat, "posChecker": True}))
-    print_for_test({"coefficients": cc_mat, "posChecker": True})
+    print_for_test({'coefficients': cc_mat, 'posChecker': True})
 
 
 def print_for_test(ans):
@@ -157,22 +182,22 @@ def print_for_test(ans):
 
 def main(argv):
     args = parse_args(argv)
-    keyword_and_urls = []
 
+    asahi_futures = []
+    morph_futures = []
     for keyword in args['keywords']:
-        url = generate_url(keyword, args['start_date'], args['end_date'])
-        keyword_and_urls.append({'keyword': keyword, 'url': url})
+        url = generate_asahi_url(keyword, args['start_date'], args['end_date'])
+        asahi_futures.append(url2week_num_dict(keyword, url, args['start_date'], args['end_date']))
+        morph_futures.append(get_response_of_goo_morph(keyword))
 
-    futures = [url2week_num_dict(k_and_u['keyword'], k_and_u['url'], args['start_date'], args['end_date']) for k_and_u in keyword_and_urls]
-    loop = asyncio.get_event_loop()
-    tasks = loop.run_until_complete(asyncio.wait(futures))[0]
+    asahi_loop = asyncio.get_event_loop()
+    asahi_tasks = asahi_loop.run_until_complete(asyncio.wait(asahi_futures))[0]
+    asahi_results = [task.result() for task in asahi_tasks]
+    cac = calc_all_combinations(args['keywords'], asahi_results)
 
-    results = [task.result() for task in tasks]
-    cac = calc_all_combinations(args['keywords'], results)
+    morph_loop = asyncio.get_event_loop()
+    morph_tasks = morph_loop.run_until_complete(asyncio.wait(morph_futures))[0]
+    morph_results = [task.result() for task in morph_tasks]
+
+
     print_result(args['keywords'], cac)
-
-    # print(pearson_correlation_coefficient(results[0]['doc_num_per_week'], results[1]['doc_num_per_week']))
-
-
-    # print(pearson_correlation_coefficient([2.8, 3.4, 3.6, 5.8, 7.0, 9.5, 10.2, 12.3, 13.2, 13.4],
-    #                                       [0.6, 3.0, 0.4, 1.5, 15.0, 13.4, 7.6, 19.8, 18.3, 18.9]))
