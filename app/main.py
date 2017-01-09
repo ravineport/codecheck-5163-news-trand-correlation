@@ -9,7 +9,7 @@ import numpy as np
 import math
 import itertools
 import os
-
+from .parts_of_speech import PartsOfSpeech
 
 asahi_end_point = 'http://54.92.123.84/search?'
 asahi_api_key = '869388c0968ae503614699f99e09d960f9ad3e12'
@@ -77,7 +77,6 @@ async def get_response_of_goo_morph(keyword):
     async with aiohttp.post(goo_morph_end_point, data=goo_morph_data) as response:
         data = await response.text()
         json_data = json.loads(data)
-        print(json_data)
         return json_data
 
 
@@ -108,8 +107,14 @@ def parse_response2week_num_list(res, start_date, end_date):
 
 
 def parse_goo_response(res):
-    word_list = res['word_list']
+    return flatten_with_any_depth(res['word_list'])
 
+
+def check_pos(responses):
+    results = [PartsOfSpeech.parts_of_speech(parse_goo_response(res)) for res in responses]
+    if -1 in results:
+        return False
+    return all([e == results[0] for e in results[1:]])
 
 
 def str2date(date_str):
@@ -159,7 +164,7 @@ def calc_all_combinations(keywords, asahi_results):
     return combinations
 
 
-def print_result(keywords, cc_result):
+def print_result(keywords, cc_result, pos_result):
     cc_mat = np.diag([1] * len(keywords)).tolist()
     cc_result.reverse()
 
@@ -171,8 +176,7 @@ def print_result(keywords, cc_result):
         for j in range(i+1, len(keywords)):
             cc_mat[j][i] = cc_mat[i][j]
 
-    # print(json.dumps({"coefficients": cc_mat, "posChecker": True}))
-    print_for_test({'coefficients': cc_mat, 'posChecker': True})
+    print_for_test({'coefficients': cc_mat, 'posChecker': pos_result})
 
 
 def print_for_test(ans):
@@ -215,6 +219,6 @@ def main(argv):
     morph_loop = asyncio.get_event_loop()
     morph_tasks = morph_loop.run_until_complete(asyncio.wait(morph_futures))[0]
     morph_results = [task.result() for task in morph_tasks]
+    pos_result = check_pos(morph_results)
 
-
-    print_result(args['keywords'], cac)
+    print_result(args['keywords'], cac, pos_result)
