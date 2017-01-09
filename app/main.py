@@ -18,6 +18,9 @@ goo_morph_end_point = 'https://labs.goo.ne.jp/api/morph'
 goo_morph_api_key = os.environ['GOO_MORPH_API_KEY']
 
 
+###
+# Utility
+###
 def flatten_with_any_depth(nested_list):
     '''
     入れ子のリストをフラットにする関数
@@ -36,12 +39,35 @@ def flatten_with_any_depth(nested_list):
 
 
 def parse_args(argv):
+    '''
+    入力をいい感じにパース
+    '''
     keywords = argv[0][1:-1].replace('"', '').replace(', ', ',').split(',')
     start_date = argv[1]
     end_date = argv[2]
     return {'keywords': keywords, 'start_date': start_date, 'end_date': end_date}
 
 
+async def get_response_by_get(url):
+    '''
+    URLをGETで叩いて結果をJSONにして返す（非同期）
+    '''
+    async with aiohttp.get(url) as response:
+        data = await response.text()
+        json_data = json.loads(data)
+        return json_data
+
+
+def str2date(date_str):
+    '''
+    date_str(string型，'2016-01-01')からdate型へ変換
+    '''
+    return datetime.date(*[int(a) for a in date_str.split('-')])
+
+
+###
+# 朝日新聞APIと相関係数の計算
+###
 def generate_asahi_url(keyword, start_date, end_date):
     '''
     keywordを含む記事を日付の範囲を指定して検索するAPIを生成
@@ -55,32 +81,10 @@ def generate_asahi_url(keyword, start_date, end_date):
     return asahi_end_point + urllib.parse.urlencode(asahi_params)
 
 
-async def get_response_by_get(url):
+async def get_response_of_asahi(keyword, url, start_date_str, end_date_str):
     '''
-    URLをGETで叩いて結果をJSONにして返す（非同期）
+    朝日新聞APIを叩いて，結果から週毎の記事の数のリストへ変換
     '''
-    async with aiohttp.get(url) as response:
-        data = await response.text()
-        json_data = json.loads(data)
-        return json_data
-
-
-async def get_response_of_goo_morph(keyword):
-    '''
-    gooの形態素解析APIをPOSTで叩いて結果をJSONにして返す（非同期）
-    '''
-    goo_morph_data = {
-        'app_id': goo_morph_api_key,
-        'sentence': keyword,
-        'info_filter': 'pos'
-    }
-    async with aiohttp.post(goo_morph_end_point, data=goo_morph_data) as response:
-        data = await response.text()
-        json_data = json.loads(data)
-        return json_data
-
-
-async def url2week_num_dict(keyword, url, start_date_str, end_date_str):
     res = await get_response_by_get(url)
     start_date = str2date(start_date_str)
     end_date = str2date(end_date_str)
@@ -106,24 +110,6 @@ def parse_response2week_num_list(res, start_date, end_date):
     return week_num_lst
 
 
-def parse_goo_response(res):
-    return flatten_with_any_depth(res['word_list'])
-
-
-def check_pos(responses):
-    results = [PartsOfSpeech.parts_of_speech(parse_goo_response(res)) for res in responses]
-    if -1 in results:
-        return False
-    return all([e == results[0] for e in results[1:]])
-
-
-def str2date(date_str):
-    '''
-    date_str(string型，'2016-01-01')からdate型へ変換
-    '''
-    return datetime.date(*[int(a) for a in date_str.split('-')])
-
-
 def init_week_num_lst(start_date, end_date):
     '''
     start_date ~ end_dateまでの週数個の要素を持つ0で初期化されたリスト(端数の日数は含まない)
@@ -140,6 +126,9 @@ def date2week_num_index(start_date, date):
 
 
 def pearson_correlation_coefficient(lst1, lst2):
+    '''
+    ピアソンの積相関係数を計算
+    '''
     if all([x == 0 for x in lst1]) or all([x == 0 for x in lst2]):
         return None
     x = np.array(lst1)
@@ -154,6 +143,9 @@ def pearson_correlation_coefficient(lst1, lst2):
 
 
 def calc_all_combinations(keywords, asahi_results):
+    '''
+    すべてのkeyword間で相関係数を計算
+    '''
     combinations = []
     for comb in itertools.combinations(keywords, 2):
         week_num_lsts = list(map(lambda x: x['doc_num_per_week'], filter(lambda r: r['keyword'] in comb, asahi_results)))
@@ -164,7 +156,48 @@ def calc_all_combinations(keywords, asahi_results):
     return combinations
 
 
+###
+# goo 形態素解析API
+###
+async def get_response_of_goo_morph(keyword):
+    '''
+    gooの形態素解析APIをPOSTで叩いて結果をJSONにして返す（非同期）
+    '''
+    goo_morph_data = {
+        'app_id': goo_morph_api_key,
+        'sentence': keyword,
+        'info_filter': 'pos'
+    }
+    async with aiohttp.post(goo_morph_end_point, data=goo_morph_data) as response:
+        data = await response.text()
+        json_data = json.loads(data)
+        return json_data
+
+
+def parse_goo_response(res):
+    '''
+    goo 形態素解析APIの結果から必要な部分を整形して返す
+    '''
+    return flatten_with_any_depth(res['word_list'])
+
+
+def check_pos(responses):
+    '''
+    goo 形態素解析APIの結果からすべてのkeywordの品詞が一致しているかを計算
+    '''
+    results = [PartsOfSpeech.parts_of_speech(parse_goo_response(res)) for res in responses]
+    if -1 in results:
+        return False
+    return all([e == results[0] for e in results[1:]])
+
+
+###
+# 結果出力まわり
+###
 def print_result(keywords, cc_result, pos_result):
+    '''
+    結果をJSONにして出力
+    '''
     cc_mat = np.diag([1] * len(keywords)).tolist()
     cc_result.reverse()
 
@@ -208,7 +241,7 @@ def main(argv):
     morph_futures = []
     for keyword in args['keywords']:
         url = generate_asahi_url(keyword, args['start_date'], args['end_date'])
-        asahi_futures.append(url2week_num_dict(keyword, url, args['start_date'], args['end_date']))
+        asahi_futures.append(get_response_of_asahi(keyword, url, args['start_date'], args['end_date']))
         morph_futures.append(get_response_of_goo_morph(keyword))
 
     asahi_loop = asyncio.get_event_loop()
