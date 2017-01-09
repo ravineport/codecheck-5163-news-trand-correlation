@@ -168,7 +168,6 @@ def main(argv):
     morph_futures = []
     for keyword in args['keywords']:
         asahi = Asahi(keyword, args['start_date'], args['end_date'])
-        asahi.generate_asahi_url()
         asahi_futures.append(asahi.get_response_of_asahi())
         morph_futures.append(get_response_of_goo_morph(keyword))
 
