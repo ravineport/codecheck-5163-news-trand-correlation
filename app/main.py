@@ -18,6 +18,23 @@ goo_morph_end_point = 'https://labs.goo.ne.jp/api/morph'
 goo_morph_api_key = os.environ['GOO_MORPH_API_KEY']
 
 
+def flatten_with_any_depth(nested_list):
+    '''
+    入れ子のリストをフラットにする関数
+    '''
+    flat_list = []
+    fringe = [nested_list]
+
+    while len(fringe) > 0:
+        node = fringe.pop(0)
+        if isinstance(node, list):
+            fringe = node + fringe
+        else:
+            flat_list.append(node)
+
+    return flat_list
+
+
 def parse_args(argv):
     keywords = argv[0][1:-1].replace('"', '').replace(', ', ',').split(',')
     start_date = argv[1]
