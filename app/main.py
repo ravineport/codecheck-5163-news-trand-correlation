@@ -9,6 +9,7 @@ import numpy as np
 import math
 import itertools
 import os
+from .asahi import Asahi
 from .parts_of_speech import PartsOfSpeech
 
 asahi_end_point = 'http://54.92.123.84/search?'
@@ -48,83 +49,9 @@ def parse_args(argv):
     return {'keywords': keywords, 'start_date': start_date, 'end_date': end_date}
 
 
-async def get_response_by_get(url):
-    '''
-    URLをGETで叩いて結果をJSONにして返す（非同期）
-    '''
-    async with aiohttp.get(url) as response:
-        data = await response.text()
-        json_data = json.loads(data)
-        return json_data
-
-
-def str2date(date_str):
-    '''
-    date_str(string型，'2016-01-01')からdate型へ変換
-    '''
-    return datetime.date(*[int(a) for a in date_str.split('-')])
-
-
 ###
-# 朝日新聞APIと相関係数の計算
+# 相関係数の計算
 ###
-def generate_asahi_url(keyword, start_date, end_date):
-    '''
-    keywordを含む記事を日付の範囲を指定して検索するAPIを生成
-    '''
-    asahi_params = {
-        'q': "Body:" + keyword + " AND ReleaseDate:[" + start_date + " TO " + end_date + "]",
-        'wt': 'json',
-        'rows': '100',
-        'ackey': asahi_api_key
-    }
-    return asahi_end_point + urllib.parse.urlencode(asahi_params)
-
-
-async def get_response_of_asahi(keyword, url, start_date_str, end_date_str):
-    '''
-    朝日新聞APIを叩いて，結果から週毎の記事の数のリストへ変換
-    '''
-    res = await get_response_by_get(url)
-    start_date = str2date(start_date_str)
-    end_date = str2date(end_date_str)
-    return {'keyword': keyword, 'doc_num_per_week': parse_response2week_num_list(res, start_date, end_date)}
-
-
-def parse_response2week_num_list(res, start_date, end_date):
-    '''
-    レスポンス(json)から週毎の記事の数のリストへ変換
-    '''
-    # TODO
-    # numFoundが100を超えていた場合の処理
-    if res['response']['result']['numFound'] == '0':
-        return init_week_num_lst(start_date, end_date)
-
-    docs = res['response']['result']['doc']
-    week_num_lst = init_week_num_lst(start_date, end_date)
-    for doc in docs:
-        release_date = str2date(doc['ReleaseDate'])
-        idx = date2week_num_index(start_date, release_date)
-        if idx < len(week_num_lst):
-            week_num_lst[idx] += 1
-    return week_num_lst
-
-
-def init_week_num_lst(start_date, end_date):
-    '''
-    start_date ~ end_dateまでの週数個の要素を持つ0で初期化されたリスト(端数の日数は含まない)
-    '''
-    lst_size = math.floor((end_date - start_date).days / 7)
-    return [0] * lst_size
-
-
-def date2week_num_index(start_date, date):
-    '''
-    dateを何週目かを表すインデックスに変換
-    '''
-    return math.floor((date - start_date).days / 7)
-
-
 def pearson_correlation_coefficient(lst1, lst2):
     '''
     ピアソンの積相関係数を計算
@@ -240,8 +167,9 @@ def main(argv):
     asahi_futures = []
     morph_futures = []
     for keyword in args['keywords']:
-        url = generate_asahi_url(keyword, args['start_date'], args['end_date'])
-        asahi_futures.append(get_response_of_asahi(keyword, url, args['start_date'], args['end_date']))
+        asahi = Asahi(keyword, args['start_date'], args['end_date'])
+        asahi.generate_asahi_url()
+        asahi_futures.append(asahi.get_response_of_asahi())
         morph_futures.append(get_response_of_goo_morph(keyword))
 
     asahi_loop = asyncio.get_event_loop()
