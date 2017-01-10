@@ -86,8 +86,6 @@ class Asahi:
         '''
         レスポンス(json)から週毎の記事の数のリストへ変換
         '''
-        # TODO
-        # numFoundが100を超えていた場合の処理
         week_num_lst = self.init_week_num_lst()
         if res['response']['result']['numFound'] == '0':
             return week_num_lst
