@@ -43,7 +43,7 @@ def parse_args(argv):
     '''
     入力をいい感じにパース
     '''
-    keywords = argv[0][1:-1].replace('"', '').replace(', ', ',').split(',')
+    keywords = argv[0][1:-1].replace('"', '').replace(', ', ',').encode('utf-8', 'surrogateescape').decode('utf-8').split(',')
     start_date = argv[1]
     end_date = argv[2]
     return {'keywords': keywords, 'start_date': start_date, 'end_date': end_date}
