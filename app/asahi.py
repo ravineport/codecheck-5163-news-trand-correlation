@@ -56,16 +56,31 @@ class Asahi:
         res = await get_response_by_get(url)
 
         doc_num = int(res['response']['result']['numFound']) # 取得すべきdocの数
-        # getted_doc_num = 0 # 取得できたdocの数
-        # while  doc_num > 100: # 100以上見つかったとき残りを取りに行く処理
-        #     getted_doc_num += 100
-        #     self.api_params['start'] = getted_doc_num
-        #     doc_num -= 100
-        #     url2 = self.generate_asahi_url()
-        #     res2 = await get_response_by_get(url2)
-        #     res['response']['result']['doc'].extend(res2['response']['result']['doc'])
+
+        if doc_num > 100:
+            rest_docs = await self.get_rest_docs(doc_num)
+            for docs in rest_docs:
+                res['response']['result']['doc'].extend(docs)
 
         return {'keyword': self.keyword, 'doc_num_per_week': self.parse_response2week_num_list(res)}
+
+    async def get_rest_docs(self, doc_num):
+        '''
+        検索結果が100より多くあったとき，残りを非同期で取りに行く関数
+        '''
+        getted_doc_num = 0 # 取得できたdocの数
+        rest_futures = []
+
+        while  doc_num > 100:
+            getted_doc_num += 100
+            self.api_params['start'] = getted_doc_num
+            doc_num -= 100
+            url = self.generate_asahi_url()
+            rest_futures.append(get_response_by_get(url))
+
+        results = await asyncio.gather(*rest_futures)
+        return [r['response']['result']['doc'] for r in results]
+
 
     def parse_response2week_num_list(self, res):
         '''
