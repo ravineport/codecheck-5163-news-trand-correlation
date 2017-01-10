@@ -56,14 +56,14 @@ class Asahi:
         res = await get_response_by_get(url)
 
         doc_num = int(res['response']['result']['numFound']) # 取得すべきdocの数
-        getted_doc_num = 0 # 取得できたdocの数
-        while  doc_num > 100: # 100以上見つかったとき残りを取りに行く処理
-            getted_doc_num += 100
-            self.api_params['start'] = getted_doc_num
-            doc_num -= 100
-            url2 = self.generate_asahi_url()
-            res2 = await get_response_by_get(url2)
-            res['response']['result']['doc'].extend(res2['response']['result']['doc'])
+        # getted_doc_num = 0 # 取得できたdocの数
+        # while  doc_num > 100: # 100以上見つかったとき残りを取りに行く処理
+        #     getted_doc_num += 100
+        #     self.api_params['start'] = getted_doc_num
+        #     doc_num -= 100
+        #     url2 = self.generate_asahi_url()
+        #     res2 = await get_response_by_get(url2)
+        #     res['response']['result']['doc'].extend(res2['response']['result']['doc'])
 
         return {'keyword': self.keyword, 'doc_num_per_week': self.parse_response2week_num_list(res)}
 
